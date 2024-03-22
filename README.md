@@ -1,5 +1,5 @@
 # MorphDAG-Lite
-This repository contains the source code and the experiment scripts of MorphDAG-Lite, a lite version of an elastic DAG-based Blockchain. It provides an elastic DAG storage model and a dual-mode transaction processing mechanism to achieve elastic storage and transaction processing.
+This repository contains the source code and the experiment scripts of MorphDAG-Lite, a lite version of an elastic DAG-based Blockchain. It provides an elastic DAG storage model and a dual-mode transaction processing mechanism to achieve elastic storage and processing.
 
 For more technical details, please refer to the paper [IEEE TKDE'24] MorphDAG: A Workload-Aware Elastic DAG-based Blockchain
 
