@@ -14,7 +14,7 @@ type Block struct {
 	Timestamp int64
 	//Transactions   []*Transaction
 	// TODO: separate block header and body transfer
-	Transactions   map[string]struct{}
+	//Transactions   map[string]struct{}
 	MerkleRootHash []byte
 	MerkleProof    *merkletree.Proof
 	PrevBlockHash  [][]byte
@@ -36,16 +36,9 @@ type VRFInfo struct {
 }
 
 // NewBlock creates and returns Block
-func NewBlock(transactions []*Transaction, rootHash, stateRoot []byte, height, con, stake int) *Block {
-	var txHashes = make(map[string]struct{})
-	for _, tx := range transactions {
-		hash := tx.String()
-		txHashes[hash] = struct{}{}
-	}
-
+func NewBlock(txs map[string]struct{}, rootHash, stateRoot []byte, height, con, stake int) *Block {
 	block := &Block{
 		time.Now().Unix(),
-		txHashes,
 		rootHash,
 		new(merkletree.Proof),
 		[][]byte{},
@@ -57,6 +50,7 @@ func NewBlock(transactions []*Transaction, rootHash, stateRoot []byte, height, c
 		nil,
 	}
 
+	block.TxRoot = HashTransactions(txs)
 	newvrf := NewVRF(block, con, stake)
 	selected, hash, info := newvrf.Sortition()
 
@@ -65,21 +59,16 @@ func NewBlock(transactions []*Transaction, rootHash, stateRoot []byte, height, c
 	}
 
 	block.BlockHash = hash[:]
-	block.TxRoot = block.HashTransactions()
 	block.Info = info
 
 	return block
 }
 
 // NewGenesisBlock creates and returns genesis Block
-func NewGenesisBlock(coinbase *Transaction, num int) *Block {
+func NewGenesisBlock(num int) *Block {
 	data := utils.IntToHex(int64(num*1000 + 1000))
-	var txHashes = make(map[string]struct{})
-	txHashes[coinbase.String()] = struct{}{}
-
 	return &Block{
 		0,
-		txHashes,
 		[]byte{},
 		new(merkletree.Proof),
 		[][]byte{},
@@ -90,22 +79,6 @@ func NewGenesisBlock(coinbase *Transaction, num int) *Block {
 		0,
 		nil,
 	}
-}
-
-// HashTransactions returns a hash of the transactions in the block
-func (b *Block) HashTransactions() []byte {
-	var transactions [][]byte
-	for id := range b.Transactions {
-		transactions = append(transactions, []byte(id))
-	}
-
-	mTree, err := merkletree.New(transactions)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	root := mTree.Root()
-	return root
 }
 
 // Serialize serializes the block
@@ -132,4 +105,20 @@ func DeserializeBlock(d []byte) *Block {
 	}
 
 	return &block
+}
+
+// HashTransactions returns a hash of the transactions in the block
+func HashTransactions(txs map[string]struct{}) []byte {
+	var transactions [][]byte
+	for id := range txs {
+		transactions = append(transactions, []byte(id))
+	}
+
+	mTree, err := merkletree.New(transactions)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	root := mTree.Root()
+	return root
 }

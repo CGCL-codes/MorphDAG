@@ -85,8 +85,7 @@ func CreateBlockchain(nodeID string, address string, chainNumber int) *Blockchai
 	curChainSets := new(sync.Map)
 
 	for i := 0; i < chainNumber; i++ {
-		cbtx := types.NewCoinbaseTX(address)
-		genesis := types.NewGenesisBlock(cbtx, i)
+		genesis := types.NewGenesisBlock(i)
 		err = StoreBlock(db, *genesis)
 		if err != nil {
 			log.Panic(err)
@@ -297,7 +296,7 @@ func (bc *Blockchain) GetCurrentBlocks() *sync.Map {
 }
 
 // ProposeBlock proposes a new block with the provided transactions via cryptographic sorition
-func (bc *Blockchain) ProposeBlock(transactions []*types.Transaction, con, stake int, stateRoot []byte) *types.Block {
+func (bc *Blockchain) ProposeBlock(transactions map[string]struct{}, con, stake int, stateRoot []byte) *types.Block {
 	var latestEpoch int
 	var lastHash [][]byte
 	var newBlock *types.Block

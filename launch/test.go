@@ -6,15 +6,11 @@ import (
 	"MorphDAG/core/tp"
 	"MorphDAG/core/types"
 	"MorphDAG/nezha"
-	"bufio"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/chinuy/zipf"
-	"io"
-	"log"
 	"math/rand"
-	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,103 +31,102 @@ func main() {
 
 	flag.Uint64Var(&addrNum, "a", 100000, "specify address number to use. defaults to 10000.")
 	flag.IntVar(&blkNum, "b", 16, "specify transaction number to use. defaults to 5.")
-	flag.Float64Var(&skew, "s", 1.2, "specify skew to use. defaults to 0.2.")
-	flag.Float64Var(&topk, "k", 0.05, "specify the threshold to identify hotspot accounts. defaults to 0.05.")
-	flag.IntVar(&ratio, "r", 0, "specify the read-write ratio. defaults to 3.")
+	flag.Float64Var(&skew, "s", 1.0, "specify skew to use. defaults to 0.2.")
+	flag.Float64Var(&topk, "k", 0.01, "specify the threshold to identify hotspot accounts. defaults to 0.01.")
+	flag.IntVar(&ratio, "r", 6, "specify the read-write ratio. defaults to 3.")
 	flag.Parse()
 
-	//data.CreateBatchTxs("../data/newEthTxs1.txt", 50000)
+	//data.CreateBatchTxs("./data/newEthTxs2.txt", 10000)
 	//txs := data.ReadEthTxsFile("./data/newEthTxs1.txt")
 	//fmt.Println(len(txs))
 
-	file, err := os.Open("./data/newEthTxs1.txt")
-	if err != nil {
-		log.Panic("Read error: ", err)
-	}
-	defer file.Close()
-	r := bufio.NewReader(file)
-
-	var ttxs = make(map[string][]*types.Transaction)
-	var writesum int
-	var iwsum int
-	var readsum int
-
-	for i := 0; i < 40; i++ {
-		var txs []*types.Transaction
-		for j := 0; j < 1000; j++ {
-			var tx types.Transaction
-			txdata, err2 := r.ReadBytes('\n')
-			if err2 != nil {
-				if err2 == io.EOF {
-					break
-				}
-				log.Panic(err2)
-			}
-			err2 = json.Unmarshal(txdata, &tx)
-			if err2 != nil {
-				log.Panic(err)
-			}
-			txs = append(txs, &tx)
-
-			for _, sets := range tx.Data().RWSets {
-				for _, rw := range sets {
-					if rw.Label == "w" || rw.Label == "iw" {
-						writesum++
-						if rw.Label == "iw" {
-							iwsum++
-							readsum++
-						}
-					} else if rw.Label == "r" {
-						readsum++
-					}
-				}
-			}
-		}
-		ttxs[strconv.Itoa(i)] = txs
-	}
+	//file, err := os.Open("./data/newEthTxs2.txt")
+	//if err != nil {
+	//	log.Panic("Read error: ", err)
+	//}
+	//defer file.Close()
+	//r := bufio.NewReader(file)
+	//
+	//var ttxs = make(map[string][]*types.Transaction)
+	//var writesum int
+	//var iwsum int
+	//var readsum int
+	//
+	//for i := 0; i < 40; i++ {
+	//	var txs []*types.Transaction
+	//	for j := 0; j < 1000; j++ {
+	//		var tx types.Transaction
+	//		txdata, err2 := r.ReadBytes('\n')
+	//		if err2 != nil {
+	//			if err2 == io.EOF {
+	//				break
+	//			}
+	//			log.Panic(err2)
+	//		}
+	//		err2 = json.Unmarshal(txdata, &tx)
+	//		if err2 != nil {
+	//			log.Panic(err)
+	//		}
+	//		txs = append(txs, &tx)
+	//
+	//		for _, sets := range tx.Data().RWSets {
+	//			for _, rw := range sets {
+	//				if rw.Label == "w" || rw.Label == "iw" {
+	//					writesum++
+	//					if rw.Label == "iw" {
+	//						iwsum++
+	//						readsum++
+	//					}
+	//				} else if rw.Label == "r" {
+	//					readsum++
+	//				}
+	//			}
+	//		}
+	//	}
+	//	ttxs[strconv.Itoa(i)] = txs
+	//}
 
 	//fmt.Println(readsum)
 	//fmt.Println(writesum)
 	//fmt.Println(iwsum)
-	fmt.Println(float64(writesum) / float64(writesum+readsum))
-	fmt.Println(float64(readsum) / float64(writesum+readsum))
-	fmt.Println(float64(iwsum) / float64(writesum))
-
-	hotAccounts := core.AnalyzeHotAccounts(ttxs, 0.01, false, false)
-
-	var accesses = make(map[string]int)
-
-	for _, txs := range ttxs {
-		for _, tx := range txs {
-			load := tx.Data().RWSets
-			for addr := range load {
-				accesses[addr]++
-			}
-		}
-	}
-
-	var haccess int
-	var caccess int
-	var hotnum int
-	var coldnum int
-
-	for addr, freq := range accesses {
-		if _, ok := hotAccounts[addr]; ok {
-			haccess += freq
-			hotnum++
-		} else {
-			caccess += freq
-			coldnum++
-		}
-	}
-
-	fmt.Println(hotnum)
-	fmt.Println(coldnum)
-	fmt.Println(haccess)
-	fmt.Println(caccess)
-	fmt.Println(float64(caccess) / float64(coldnum))
-	fmt.Println(float64(haccess) / float64(hotnum))
+	//fmt.Println(float64(writesum) / float64(writesum+readsum))
+	//fmt.Println(float64(readsum) / float64(writesum+readsum))
+	//fmt.Println(float64(iwsum) / float64(writesum))
+	//
+	//hotAccounts := core.AnalyzeHotAccounts(ttxs, 0.01, false, false)
+	//
+	//var accesses = make(map[string]int)
+	//
+	//for _, txs := range ttxs {
+	//	for _, tx := range txs {
+	//		load := tx.Data().RWSets
+	//		for addr := range load {
+	//			accesses[addr]++
+	//		}
+	//	}
+	//}
+	//
+	//var haccess int
+	//var caccess int
+	//var hotnum int
+	//var coldnum int
+	//
+	//for addr, freq := range accesses {
+	//	if _, ok := hotAccounts[addr]; ok {
+	//		haccess += freq
+	//		hotnum++
+	//	} else {
+	//		caccess += freq
+	//		coldnum++
+	//	}
+	//}
+	//
+	//fmt.Println(hotnum)
+	//fmt.Println(coldnum)
+	//fmt.Println(haccess)
+	//fmt.Println(caccess)
 	//fmt.Println(float64(caccess) / float64(coldnum))
+	//fmt.Println(float64(haccess) / float64(hotnum))
 
 	//var result []int
 	//var res int
@@ -167,10 +162,10 @@ func main() {
 	//}
 	//w.Flush()
 
-	//txs := CreateBatchTxs(blkNum, ratio, addrNum, skew)
+	txs := CreateBatchTxs(blkNum, ratio, addrNum, skew)
 	//
-	//runtime.GOMAXPROCS(runtime.NumCPU())
-	//file, err := os.Open("../data/newEthTxs1.txt")
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	//file, err := os.Open("./data/newEthTxs1.txt")
 	//if err != nil {
 	//	log.Panic("Read error: ", err)
 	//}
@@ -197,33 +192,33 @@ func main() {
 	//	ttxs[strconv.Itoa(i)] = txs
 	//}
 
-	//var sum1 int64
-	////var sum2 int64
-	////var sum3 int64
-	//
-	//statedb1, _ := state.NewState(dbFile1, nil)
-	//statedb1.BatchCreateObjects(txs)
-	//for i := 0; i < 20; i++ {
-	//	d := runTestMorphDAG(txs, float32(topk), statedb1)
-	//	sum1 += d
-	//}
-	//fmt.Printf("Average time of MorphDAG: %.2f\n", float64(sum1)/20)
+	var sum1 int64
+	var sum2 int64
+	var sum3 int64
 
-	//statedb2, _ := state.NewState(dbFile2, nil)
-	//statedb2.BatchCreateObjects(txs)
-	//for i := 0; i < 5; i++ {
-	//	d := runTestSerial(txs, statedb2)
-	//	sum2 += d
-	//}
-	//fmt.Printf("Average time of Serial: %.2f\n", float64(sum2)/5)
-	//
-	//statedb3, _ := state.NewState(dbFile3, nil)
-	//statedb3.BatchCreateObjects(txs)
-	//for i := 0; i < 5; i++ {
-	//	d := runTestNezha(txs, blkNum, statedb3)
-	//	sum3 += d
-	//}
-	//fmt.Printf("Average time of Nezha: %.2f\n", float64(sum3)/5)
+	statedb1, _ := state.NewState(dbFile1, nil)
+	statedb1.BatchCreateObjects(txs)
+	for i := 0; i < 5; i++ {
+		d := runTestMorphDAG(txs, float32(topk), statedb1)
+		sum1 += d
+	}
+	fmt.Printf("Average time of MorphDAG: %.2f\n", float64(sum1)/5)
+
+	statedb2, _ := state.NewState(dbFile2, nil)
+	statedb2.BatchCreateObjects(txs)
+	for i := 0; i < 5; i++ {
+		d := runTestSerial(txs, statedb2)
+		sum2 += d
+	}
+	fmt.Printf("Average time of Serial: %.2f\n", float64(sum2)/5)
+
+	statedb3, _ := state.NewState(dbFile3, nil)
+	statedb3.BatchCreateObjects(txs)
+	for i := 0; i < 5; i++ {
+		d := runTestNezha(txs, blkNum, statedb3)
+		sum3 += d
+	}
+	fmt.Printf("Average time of Nezha: %.2f\n", float64(sum3)/5)
 }
 
 func runTestMorphDAG(txs map[string][]*types.Transaction, ratio float32, state *state.StateDB) int64 {
@@ -506,6 +501,8 @@ func CreateNezhaRWNodes(txs map[string][]*types.Transaction) [][]*nezha.RWNode {
 						wAddr = append(wAddr, []byte(addr))
 						wValue = append(wValue, []byte("10"))
 					} else if strings.Compare(rw.Label, "iw") == 0 && !isExist(wAddr, []byte(addr)) {
+						rAddr = append(rAddr, []byte(addr))
+						rValue = append(rValue, []byte("10"))
 						wAddr = append(wAddr, []byte(addr))
 						wValue = append(wValue, []byte("10"))
 					}

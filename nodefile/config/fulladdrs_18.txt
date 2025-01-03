@@ -1,2 +1,0 @@
-/ip4/172.18.197.125/tcp/9250/p2p/QmVBTUMg2X4cygzqPUY9azCrCqwau4dyR7zNEuWHdmeTEi
-/ip4/127.0.0.1/tcp/9250/p2p/QmVBTUMg2X4cygzqPUY9azCrCqwau4dyR7zNEuWHdmeTEi

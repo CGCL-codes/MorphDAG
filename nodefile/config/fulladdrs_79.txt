@@ -1,2 +1,0 @@
-/ip4/172.27.194.56/tcp/9251/p2p/QmbcWGMX7Xy5Q2sTN1ot86RX3pKqkdzbDxWsUjfep4bSzH
-/ip4/127.0.0.1/tcp/9251/p2p/QmbcWGMX7Xy5Q2sTN1ot86RX3pKqkdzbDxWsUjfep4bSzH

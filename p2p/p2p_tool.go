@@ -24,14 +24,16 @@ type NetworkDealer struct {
 	//txConnPool       map[string]*conn
 	//blkConnPool      map[string]*conn
 	//sigConnPool      map[string]*conn
-	connPool     map[string]*conn
-	connPoolLock sync.Mutex
-	syncLock     sync.Mutex
-	txChannel    chan MsgWithType
-	blkChannel   chan MsgWithType
-	// payloadChannel   chan MsgWithType
-	RunSignalHandler func(request []byte)
-	Host             host.Host
+	connPool       map[string]*conn
+	connPoolLock   sync.Mutex
+	syncLock       sync.Mutex
+	txChannel      chan MsgWithType
+	blkChannel     chan MsgWithType
+	payloadChannel chan MsgWithType
+	//signalChannel chan MsgWithType
+	SignalHandler func(request []byte)
+
+	Host host.Host
 }
 
 // MsgWithType a message format with a type
@@ -182,8 +184,12 @@ func (n *NetworkDealer) HandleConn(reader *bufio.Reader) {
 			select {
 			case n.blkChannel <- msgWithType:
 			}
-		} else if command == "run" {
-			n.RunSignalHandler(bytes)
+		} else if command == "payload" {
+			select {
+			case n.payloadChannel <- msgWithType:
+			}
+		} else if command == "sync" {
+			n.SignalHandler(bytes)
 		}
 	}
 }
@@ -343,14 +349,11 @@ func NewNetworkDealer(port int, prvkey crypto.PrivKey, addrsPath string) (*Netwo
 	}
 
 	n := &NetworkDealer{
-		//txConnPool:  make(map[string]*conn),
-		//blkConnPool: make(map[string]*conn),
-		//sigConnPool: make(map[string]*conn),
-		connPool:   make(map[string]*conn),
-		txChannel:  make(chan MsgWithType, 50000),
-		blkChannel: make(chan MsgWithType, 10000),
-		//payloadChannel: make(chan MsgWithType, 50000),
-		Host: h,
+		connPool:       make(map[string]*conn),
+		txChannel:      make(chan MsgWithType, 50000),
+		blkChannel:     make(chan MsgWithType, 10000),
+		payloadChannel: make(chan MsgWithType, 10000),
+		Host:           h,
 	}
 
 	return n, nil
@@ -362,4 +365,8 @@ func (n *NetworkDealer) ExtractTx() chan MsgWithType {
 
 func (n *NetworkDealer) ExtractBlk() chan MsgWithType {
 	return n.blkChannel
+}
+
+func (n *NetworkDealer) ExtractPayload() chan MsgWithType {
+	return n.payloadChannel
 }

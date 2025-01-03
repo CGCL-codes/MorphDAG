@@ -44,8 +44,8 @@ func (server *RPCServer) SendBatchTxs(cmd SendBatchTxsCmd, reply *SendBatchTxsRe
 	txs := cmd.Txs
 	for _, t := range txs {
 		// serialize tx data and broadcast to the network
-		txData := tx{server.RPC.NodeID, *t}
-		payload, _ := json.Marshal(txData)
+		//txData := tx{server.RPC.NodeID, *t}
+		payload, _ := json.Marshal(t)
 		request := append(commandToBytes("tx"), payload...)
 		err := server.Network.SyncMsg(request)
 		if err != nil {

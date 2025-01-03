@@ -44,7 +44,7 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 
 	data := bytes.Join(
 		[][]byte{
-			pow.block.HashTransactions(),
+			//pow.block.HashTransactions(),
 			utils.IntToHex(int64(r)),
 			utils.IntToHex(int64(pow.bits)),
 			utils.IntToHex(int64(nonce)),

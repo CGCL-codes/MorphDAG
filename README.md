@@ -13,7 +13,7 @@ In the sub-directory `launch`, compile the node network configuration file `node
 
 On Mac OS:
 
-```
+```shell
 cd launch
 CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build node_config.go
 CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build start_server.go
@@ -24,7 +24,7 @@ For Apple M1 or M2 chip, you should use `GOARCH=arm64`.
 
 On Windows:
 
-```
+```shell
 cd launch
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build node_config.go
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build start_server.go
@@ -33,21 +33,101 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build start_client.go
 
 On Linux:
 
-```
+```shell
 cd launch
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build node_config.go
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build start_server.go
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build start_client.go
 ```
 
-### 3. Fetch Ethereum dataset
+## Deploy & Run
 
-We capture Ethereum transaction data by running an Ethereum full node, and convert the transaction data into the transaction format of MorphDAG through converters. In the sub-directory `data`, compile the transaction fetcher file `txData.go` and run:
+All the experimental scripts are located in the sub-directory `experiments`.
 
-```
-cd data
-go build txData.go
-./txData -b=$blockNum
+```shell
+cd ../experiments
 ```
 
-`$blockNum` denotes the number of blocks you want to fetch. Lastly, the Ethereum transaction dataset is stored in `EthTxs.txt`.
+- #### Fetch the Ethereum datatset
+
+Due to the large-scale transaction workloads used in the actual experiments, which includes 36,142,890 transactions (approximately several tens of GB), we have reduced the dataset size for easier sharing and user operation. The dataset can be accessed via the following Google Drive link:
+
+```
+https://drive.google.com/file/d/19Cneu2rX3BlDN3CJmcYkEumV628cp_XU/view?usp=drive_link
+```
+
+Please download the file `newEthTxs.txt` and place it into the folder `../data`.
+
+- #### Run in a local node environment
+
+Step 1: configure the node connection file
+
+```shell
+./nodeconfig_local.sh $num
+```
+
+`$num` denotes the number of MorphDAG nodes run locally. Generated node address files are stored in `../nodefile`.
+
+Step 2: run the daemon (server program) of MorphDAG
+
+```shell
+./server_local.sh $num $cycles
+```
+
+`$cycles` denotes the number of cycles MorphDAG servers run. It will take 2~3 minutes for node discovery and connections. After all server processes print `Server $id starts` on the terminal , please run the client program immediately.
+
+Step 3: run the client program of MorphDAG
+
+```shell
+./client_local.sh $send $large $observe
+```
+
+`$send` denotes the number of transaction sending cycles. `$large` denotes whether to use the large workload size (0 is the Ethereum workload size and 1 is the large workload size). `loads.txt` depicts the Ethereum workload size, and `large_loads.txt` depicts the large workload size. You can modify `large_loads.txt` to change the transaction sending rate (each row represents the number of transactions sent per second). $observe denotes the number of cycles run by anther client process to observe system tps and latency.
+
+Step 4: kill the server and client programs
+
+```shell
+./kill_local.sh
+```
+
+After running the speicific number of cycles, the server program can automatically stop, or you can dircetly kill the server and client programs. You can find two experimental results in the current directory, where `tps_appending_result.txt` presents the appending tps and latency of MorphDAG, and `tps_overall_result.txt`  presents the system overall tps and latency.
+
+- #### Run in a distributed node environment
+
+Step 1: modify `hosts.txt` and deploy compiled codes to each remote node
+
+```shell
+./deploy.sh
+```
+
+Please enter the ip address of each remote node in `hosts.txt`. Notice that you should enable your work computer to login in these remote nodes without passwords in advance.
+
+Step 2: configure the node connection file
+
+```shell
+./nodeconfig.sh $num
+```
+
+`$num` denotes the number of MorphDAG nodes run in a distributed environment. Generated node address files are stored in `../nodefile/ecs/` in the local, as well as in `~/MorphDAG/nodefile` in each remote node.
+
+Step 3: run the daemon (server program) of MorphDAG
+
+```shell
+./server.sh $num $cycles $large
+```
+
+In a distributed environment, we directly use the daemon program for tx sending and performance observation (pick two different servers for performing those). `$num` denotes the number of running MorphDAG servers. `$cycles` denotes the number of cycles MorphDAG servers run and the number of cycles of tx sending. `$large` denotes whether to use the large workload size (0 is the Ethereum workload size and 1 is the large workload size).
+
+Step 4: kill the server programs
+
+```shell
+./kill.sh
+```
+
+Step 5: download the experimental results
+
+```shell
+./download.sh
+```
+
+Since the observation results are stored on the remote machine who runs the server program, please download the relevant files `tps_appending_result.txt` and `tps_overall_result.txt` from the server side.
