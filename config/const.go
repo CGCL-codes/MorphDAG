@@ -5,7 +5,7 @@ const DBfile = "../dagdata/MorphDAG_%s"
 const DBfile2 = "../dagdata/MorphDAG_State_%s"
 const CommonLoads = "../experiments/loads.txt"
 const LargeLoads = "../experiments/large_loads.txt"
-const EthTxFile = "../data/newEthTxs1.txt"
+const EthTxFile = "../data/newEthTxs.txt"
 
 // PoW parameter
 const TargetBits = 12
@@ -19,7 +19,8 @@ const MaximumPoolSize = 100000
 
 // Blockchain parameter
 const BlockSize = 1000
-const SafeConcurrency = 90
+const SafeConcurrency = 10
+const MaximumConcurrency = 100
 const EpochTime = 6
 const MaximumProcessors = 100000
 const HotRatio = 0.01

@@ -63,7 +63,7 @@ func (vrf *VRF) prepareData(pk, hash, pi []byte) []byte {
 
 	data := bytes.Join(
 		[][]byte{
-			vrf.block.HashTransactions(),
+			vrf.block.TxRoot,
 			utils.IntToHex(int64(vrf.phi)),
 			utils.IntToHex(int64(vrf.stake)),
 			utils.IntToHex(int64(r)),

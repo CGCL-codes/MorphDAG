@@ -42,7 +42,7 @@ func init() {
 			log.Fatal("Fail to build P2P dealer: ", err)
 		}
 
-		dagServer = p2p.InitializeServer(nodeID, cmd.NodeNumber, dealer)
+		dagServer = p2p.InitializeServer(nodeID, cmd.NodeNumber, dealer, cmd.TxSender)
 		if !cmd.TxSender {
 			dagServer.CreateDAG()
 		}
@@ -65,9 +65,7 @@ func init() {
 		//go http.Serve(listener, nil)
 
 		// start the p2p connection
-		//dagServer.Network.TxHandler = dagServer.ProcessTx
-		//dagServer.Network.BlkHandler = dagServer.ProcessBlock
-		dagServer.Network.RunSignalHandler = dagServer.ProcessRunSignal
+		dagServer.Network.SignalHandler = dagServer.ProcessSyncSignal
 
 		time.Sleep(20 * time.Second)
 
@@ -98,6 +96,7 @@ func main() {
 		} else {
 			go dagServer.HandleTxForever()
 			go dagServer.HandleBlkForever()
+			go dagServer.HandlePayloadForever()
 			if cmd.Observer {
 				go dagServer.ObserveSystemTPS(cmd.Cycles)
 			}

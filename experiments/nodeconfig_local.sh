@@ -21,4 +21,3 @@ sleep 5
 # generate node files
 ../launch/node_config -n=$1 -le=true
 
-

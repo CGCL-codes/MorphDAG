@@ -8,6 +8,7 @@ require (
 	github.com/chinuy/zipf v0.0.0-20180918155919-1ef58b781f9a
 	github.com/ethereum/go-ethereum v1.11.5
 	github.com/libp2p/go-libp2p v0.25.1
+	github.com/multiformats/go-multiaddr v0.8.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/tv42/base58 v1.0.0
 	github.com/urfave/cli/v2 v2.17.2-0.20221006022127-8f469abc00aa
@@ -66,7 +67,6 @@ require (
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect
-	github.com/multiformats/go-multiaddr v0.8.0 // indirect
 	github.com/multiformats/go-multiaddr-dns v0.3.1 // indirect
 	github.com/multiformats/go-multiaddr-fmt v0.1.0 // indirect
 	github.com/multiformats/go-multibase v0.1.1 // indirect

@@ -11,12 +11,9 @@ import (
 func CalculateConcurrency(scale int) int {
 	var resCon int
 	// coefficient after fitting
-	//resCon = int(math.Ceil(0.008849*float64(scale) - 2.048))
-	resCon = int(math.Ceil(0.005093*float64(scale) - 2.419))
-
-	if resCon > config.SafeConcurrency {
-		// current block concurrency cannot exceed the safety threshold
-		return config.SafeConcurrency
+	resCon = int(math.Ceil(0.005565*float64(scale) - 1.894))
+	if resCon > config.MaximumConcurrency {
+		return config.MaximumConcurrency
 	}
 	return resCon
 }

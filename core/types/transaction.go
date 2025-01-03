@@ -44,11 +44,6 @@ type RWSet struct {
 	Value int64
 }
 
-type PayloadInfo struct {
-	TxID string
-	Data *Payload
-}
-
 // Serialize returns a serialized Payload
 func (py Payload) Serialize() []byte {
 	var encoded bytes.Buffer

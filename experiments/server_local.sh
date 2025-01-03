@@ -9,16 +9,20 @@ do
   # starts the tx sender
   if [ $i == 0 ]
     then
-      rpc=9545
+#      rpc=9545
       p2p=8520
       id=10000
-      export NODE_ID=${id}; ../launch/start_server --rpcport ${rpc} --p2pport ${p2p} --number $1 --sender=true &
+      export NODE_ID=${id}; ../launch/start_server --p2pport ${p2p} --number $1 --sender=true -cycles $2 --loadfile $3 &
       continue
   fi
 
   # starts MorphDAG servers
-  rpc=$((6499+i))
   p2p=$((9520+i))
   id=$((i-1))
-  export NODE_ID=${id}; ../launch/start_server --rpcport ${rpc} --p2pport ${p2p} --number $1 --cycles $2 &
+  if [ $id == 10 ]
+  then
+    export NODE_ID=${id}; ../launch/start_server --p2pport ${p2p} --number $1 --cycles $2 --observer=true &
+  else
+    export NODE_ID=${id}; ../launch/start_server --p2pport ${p2p} --number $1 --cycles $2 &
+  fi
 done

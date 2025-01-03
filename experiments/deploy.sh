@@ -3,11 +3,11 @@
 i=0
 cat ./hosts.txt | while read machine
 do
-   echo "deploy server code on machine ${machine}"
-   ssh -n root@${machine} "rm -rf ~/MorphDAG/nodefile/*"
-   rsync -rtuv ./install.sh root@${machine}:~
-   ssh -n root@${machine} "./install.sh"
-   rsync -rtuv ../launch/start_server root@${machine}:~/MorphDAG/launch
+#   echo "deploy server code on machine ${machine}"
+##   ssh -n root@${machine} "rm -rf ~/MorphDAG/nodefile/*"
+#   rsync -rtuv ./install.sh root@${machine}:~
+#   ssh -n root@${machine} "./install.sh"
+#   rsync -rtuv ../launch/start_server root@${machine}:~/MorphDAG/launch
 
    if [[ $i == 0 || $i == 1 ]]
    then

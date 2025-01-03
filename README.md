@@ -1,8 +1,3 @@
-# MorphDAG-Lite
-This repository contains the source code and the experiment scripts of MorphDAG-Lite, a lite version of an elastic DAG-based Blockchain. It provides an elastic DAG storage model and a dual-mode transaction processing mechanism to achieve elastic storage and processing.
-
-For more technical details, please refer to the paper [IEEE TKDE'24] MorphDAG: A Workload-Aware Elastic DAG-based Blockchain
-
 ## Build & Usage
 
 ### 1. Machine types
@@ -18,7 +13,7 @@ In the sub-directory `launch`, compile the node network configuration file `node
 
 On Mac OS:
 
-```
+```shell
 cd launch
 CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build node_config.go
 CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build start_server.go
@@ -29,7 +24,7 @@ For Apple M1 or M2 chip, you should use `GOARCH=arm64`.
 
 On Windows:
 
-```
+```shell
 cd launch
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build node_config.go
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build start_server.go
@@ -38,7 +33,7 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build start_client.go
 
 On Linux:
 
-```
+```shell
 cd launch
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build node_config.go
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build start_server.go
@@ -47,21 +42,35 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build start_client.go
 
 ## Deploy & Run
 
-All the experimental scripts are located in the sub-directory `./experiments`.
+All the experimental scripts are located in the sub-directory `experiments`.
+
+```shell
+cd ../experiments
+```
+
+- #### Fetch the Ethereum datatset
+
+Due to the large-scale transaction workloads used in the actual experiments, which includes 36,142,890 transactions (approximately several tens of GB), we have reduced the dataset size for easier sharing and user operation. The dataset can be accessed via the following Google Drive link:
+
+```
+https://drive.google.com/file/d/19Cneu2rX3BlDN3CJmcYkEumV628cp_XU/view?usp=drive_link
+```
+
+Please download the file `newEthTxs.txt` and place it into the folder `../data`.
 
 - #### Run in a local node environment
 
 Step 1: configure the node connection file
 
-```
+```shell
 ./nodeconfig_local.sh $num
 ```
 
-`$num` denotes the number of MorphDAG nodes run locally. Generated node address files are stored in `../Prototype/nodefile`.
+`$num` denotes the number of MorphDAG nodes run locally. Generated node address files are stored in `../nodefile`.
 
 Step 2: run the daemon (server program) of MorphDAG
 
-```
+```shell
 ./server_local.sh $num $cycles
 ```
 
@@ -69,7 +78,7 @@ Step 2: run the daemon (server program) of MorphDAG
 
 Step 3: run the client program of MorphDAG
 
-```
+```shell
 ./client_local.sh $send $large $observe
 ```
 
@@ -77,7 +86,7 @@ Step 3: run the client program of MorphDAG
 
 Step 4: kill the server and client programs
 
-```
+```shell
 ./kill_local.sh
 ```
 
@@ -87,7 +96,7 @@ After running the speicific number of cycles, the server program can automatical
 
 Step 1: modify `hosts.txt` and deploy compiled codes to each remote node
 
-```
+```shell
 ./deploy.sh
 ```
 
@@ -95,7 +104,7 @@ Please enter the ip address of each remote node in `hosts.txt`. Notice that you 
 
 Step 2: configure the node connection file
 
-```
+```shell
 ./nodeconfig.sh $num
 ```
 
@@ -103,7 +112,7 @@ Step 2: configure the node connection file
 
 Step 3: run the daemon (server program) of MorphDAG
 
-```
+```shell
 ./server.sh $num $cycles $large
 ```
 
@@ -111,13 +120,13 @@ In a distributed environment, we directly use the daemon program for tx sending 
 
 Step 4: kill the server programs
 
-```
+```shell
 ./kill.sh
 ```
 
 Step 5: download the experimental results
 
-```
+```shell
 ./download.sh
 ```
 

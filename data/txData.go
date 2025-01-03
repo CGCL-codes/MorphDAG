@@ -95,7 +95,7 @@ func CreateBatchTxs(filename string, num int) {
 	}
 
 	// starting block number
-	blockNumber := 12000000
+	blockNumber := 14000000
 
 	for i := blockNumber; i < (blockNumber + num); i++ {
 		number := new(big.Int).SetInt64(int64(i))
@@ -306,7 +306,7 @@ func createNewPayloads(trans []transaction.Transfer) *types.Payload {
 const (
 	minCache     = 2048
 	minHandles   = 2048
-	nativeDbPath = "../nativedb"
+	nativeDbPath = "/Volumes/ETH_DATA/newdata/nativedb"
 )
 
 func openLeveldb(path string) (*leveldb.DB, error) {

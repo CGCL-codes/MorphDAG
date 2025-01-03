@@ -9,7 +9,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/chinuy/zipf"
 	"io"
 	"io/ioutil"
 	"log"
@@ -39,23 +38,25 @@ type Server struct {
 	Stake           int
 	ProcessingQueue map[string][]*types.Transaction
 	CompletedQueue  map[string][]*types.Transaction
-	//PayloadQueue    *sync.Map
-	RunSignalNum int32
-	StartOrRun   bool
-	StateLock    sync.RWMutex
-	MapLock      sync.RWMutex
+	PayloadQueue    *sync.Map
+	TmpPayloadQueue *sync.Map
+	SyncSignalMap   *sync.Map
+	StartOrRun      bool
+	IsSender        bool
+	StateLock       sync.RWMutex
+	QueueLock       sync.RWMutex
 }
 
-// define the sending format of block
-type block struct {
-	From  string
-	Block types.Block
+// define the sending format of block payload (txs)
+type blkPayload struct {
+	BlkID  []byte
+	Height int
+	TXs    map[string]struct{}
 }
 
-// define the sending format of tx
-type tx struct {
-	From        string
-	Transaction types.Transaction
+// define the sending format of sync signal
+type syncSignal struct {
+	Height int
 }
 
 var totalOrder []string
@@ -63,7 +64,7 @@ var loadScale int
 var epochStart = new(sync.Map)
 var processingTime time.Duration
 
-func InitializeServer(nodeID string, nodeNumber int, dealer *NetworkDealer) *Server {
+func InitializeServer(nodeID string, nodeNumber int, dealer *NetworkDealer, sender bool) *Server {
 	dbFile := fmt.Sprintf(config.DBfile2, nodeID)
 	stateDB, err := state.NewState(dbFile, nil)
 	if err != nil {
@@ -80,20 +81,23 @@ func InitializeServer(nodeID string, nodeNumber int, dealer *NetworkDealer) *Ser
 	}
 
 	server := &Server{
-		NodeID:          nodeID,
-		Address:         nodeID,
-		Network:         dealer,
-		TxPool:          NewTxPool(),
-		StateDB:         stateDB,
-		State:           []byte{},
+		NodeID:  nodeID,
+		Address: nodeID,
+		Network: dealer,
+		TxPool:  NewTxPool(),
+		StateDB: stateDB,
+		State:   []byte{},
+		//BlockMerkleRoot: []byte{},
 		NodeNumber:      nodeNumber,
 		Concurrency:     config.SafeConcurrency,
 		Stake:           stake,
 		ProcessingQueue: make(map[string][]*types.Transaction),
 		CompletedQueue:  make(map[string][]*types.Transaction),
-		//PayloadQueue:    new(sync.Map),
-		RunSignalNum: 0,
-		StartOrRun:   false,
+		PayloadQueue:    new(sync.Map),
+		TmpPayloadQueue: new(sync.Map),
+		SyncSignalMap:   new(sync.Map),
+		StartOrRun:      false,
+		IsSender:        sender,
 	}
 
 	return server
@@ -115,24 +119,23 @@ func (server *Server) Run(cycles int) {
 
 	for i := 0; i < cycles; i++ {
 		var wg sync.WaitGroup
+		var stateRoot []byte
+		server.StartOrRun = false
+
 		if i > 0 {
 			// execute transactions in the last epoch
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				server.processTxs()
+				stateRoot = server.processTxs()
 			}()
 		}
+
 		// record the start time of each epoch
 		start := time.Now()
 		epochStart.Store(server.BC.GetLatestHeight()+1, uint64(start.Unix()))
-		server.StartOrRun = false
 		server.updateConcurrency()
 		server.createBlock(server.Concurrency)
-
-		if i > 0 {
-			wg.Wait()
-		}
 
 		var duration time.Duration
 		for {
@@ -143,34 +146,37 @@ func (server *Server) Run(cycles int) {
 		}
 
 		// sync operation
-		server.sendRunSignal()
+		server.sendSyncSignal()
 		for !server.StartOrRun {
 		}
+		if i > 0 {
+			wg.Wait()
+		}
+
 		loadScale = server.processTxPool()
 		server.BC.EnterNextEpoch()
+		if i > 0 {
+			server.setState(stateRoot)
+		}
 		fmt.Printf("Epoch %d ends\n", server.BC.GetLatestHeight())
 	}
 }
 
 // ProcessBlock processes received block and add it to the chain
 func (server *Server) ProcessBlock(request []byte) {
-	var payload block
+	var blk types.Block
 
 	data := request[config.CommandLength:]
-	err := json.Unmarshal(data, &payload)
+	err := json.Unmarshal(data, &blk)
 	if err != nil {
 		log.Panic(err)
 	}
-
-	blk := payload.Block
-	// fmt.Println("Recevied a new block!")
 
 	blockHash := blk.BlockHash
 	expBitNum := math.Ceil(math.Log2(float64(server.Concurrency)))
 	chainID := utils.ConvertBinToDec(blockHash, int(expBitNum))
 	stateRoot := server.getLatestState()
 	isAdded := server.BC.AddBlock(&blk, chainID, stateRoot)
-
 	//if isAdded {
 	//	// fmt.Println("Block verified and added successfully!")
 	//} else {
@@ -183,7 +189,22 @@ func (server *Server) ProcessBlock(request []byte) {
 
 // ProcessTx processes the received new transaction
 func (server *Server) ProcessTx(request []byte) {
-	var payload tx
+	var t types.Transaction
+
+	data := request[config.CommandLength:]
+	err := json.Unmarshal(data, &t)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	// store to the memory tx pool
+	t.SetStart()
+	server.TxPool.pending.append(&t)
+}
+
+// ProcessPayload processes the received block payload
+func (server *Server) ProcessPayload(request []byte) {
+	var payload blkPayload
 
 	data := request[config.CommandLength:]
 	err := json.Unmarshal(data, &payload)
@@ -191,33 +212,36 @@ func (server *Server) ProcessTx(request []byte) {
 		log.Panic(err)
 	}
 
-	// store to the memory tx pool
-	t := payload.Transaction
-	t.SetStart()
-	server.TxPool.pending.append(&t)
+	if payload.Height == server.BC.GetLatestHeight() || payload.Height == server.BC.GetLatestHeight()+1 {
+		server.PayloadQueue.Store(string(payload.BlkID), payload.TXs)
+	} else if payload.Height == server.BC.GetLatestHeight()+2 {
+		server.TmpPayloadQueue.Store(string(payload.BlkID), payload.TXs)
+	}
 }
 
-//func (server *Server) ProcessPayload(request []byte) {
-//	var payload types.PayloadInfo
-//
-//	data := request[config.CommandLength:]
-//	err := json.Unmarshal(data, &payload)
-//	if err != nil {
-//		log.Panic(err)
-//	}
-//
-//	server.PayloadQueue.Store(payload.TxID, payload.Data)
-//}
+// ProcessSyncSignal processes the received sync signal
+func (server *Server) ProcessSyncSignal(request []byte) {
+	if !server.IsSender {
+		var signal syncSignal
 
-// ProcessRunSignal processes the received run signal
-func (server *Server) ProcessRunSignal(request []byte) {
-	signal := bytesToCommand(request)
-	if len(signal) > 0 {
-		atomic.AddInt32(&server.RunSignalNum, 1)
-		if atomic.LoadInt32(&server.RunSignalNum) >= int32(2*(server.NodeNumber-1)/3) {
-			server.StartOrRun = true
-			// reset the number counter
-			atomic.StoreInt32(&server.RunSignalNum, 0)
+		data := request[config.CommandLength:]
+		err := json.Unmarshal(data, &signal)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		// do not receive old sync message
+		if signal.Height >= server.BC.GetLatestHeight() {
+			var num int32
+			v, exist := server.SyncSignalMap.Load(signal.Height)
+			if exist {
+				num = v.(int32)
+			}
+			atomic.AddInt32(&num, 1)
+			server.SyncSignalMap.Store(signal.Height, num)
+			if atomic.LoadInt32(&num) >= int32(server.NodeNumber/2) {
+				server.StartOrRun = true
+			}
 		}
 	}
 }
@@ -248,22 +272,24 @@ func (server *Server) HandleBlkForever() {
 	}
 }
 
-// HandlePayloadForever handles tx payloads received from the signal channel
-//func (server *Server) HandlePayloadForever() {
-//	for {
-//		select {
-//		case p := <-server.Network.ExtractPayload():
-//			switch p.Type {
-//			case "payload":
-//				go server.ProcessPayload(p.Msg)
-//			}
-//		}
-//	}
-//}
+// HandlePayloadForever handles txs contained in the block received from the payload channel
+func (server *Server) HandlePayloadForever() {
+	for {
+		select {
+		case p := <-server.Network.ExtractPayload():
+			switch p.Type {
+			case "payload":
+				go server.ProcessPayload(p.Msg)
+			}
+		}
+	}
+}
 
-// sendRunSignal broadcasts the run signal to the network
-func (server *Server) sendRunSignal() {
-	signal := commandToBytes("run")
+// sendRunSignal broadcasts the sync signal to the network
+func (server *Server) sendSyncSignal() {
+	data := syncSignal{server.BC.GetLatestHeight()}
+	bt, _ := json.Marshal(data)
+	signal := append(commandToBytes("sync"), bt...)
 	err := server.Network.SyncMsg(signal)
 	if err != nil {
 		log.Panic(err)
@@ -272,17 +298,37 @@ func (server *Server) sendRunSignal() {
 
 // createBlock packages #size of transactions into a new block
 func (server *Server) createBlock(con int) {
+	var txHashes = make(map[string]struct{})
 	server.TxPool.RetrievePending()
 	txs := server.TxPool.Pick(config.BlockSize)
-	blk := server.BC.ProposeBlock(txs, con, server.Stake, server.State)
+	for _, t := range txs {
+		hash := t.String()
+		txHashes[hash] = struct{}{}
+	}
+
+	blk := server.BC.ProposeBlock(txHashes, con, server.Stake, server.State)
 	if blk != nil {
-		data := block{server.NodeID, *blk}
-		bt, _ := json.Marshal(data)
-		req := append(commandToBytes("block"), bt...)
-		err := server.Network.SyncMsg(req)
-		if err != nil {
-			log.Panic(err)
-		}
+		// first propagates the block header
+		go func() {
+			bt, _ := json.Marshal(*blk)
+			req := append(commandToBytes("block"), bt...)
+			err := server.Network.SyncMsg(req)
+			if err != nil {
+				log.Panic(err)
+			}
+		}()
+
+		// asynchronously propagates the block payload
+		go func() {
+			server.PayloadQueue.Store(string(blk.BlockHash), txHashes)
+			data := blkPayload{blk.BlockHash, blk.Epoch, txHashes}
+			bt, _ := json.Marshal(data)
+			req := append(commandToBytes("payload"), bt...)
+			err := server.Network.SyncMsg(req)
+			if err != nil {
+				log.Panic(err)
+			}
+		}()
 	}
 }
 
@@ -298,15 +344,13 @@ func (server *Server) processTxPool() int {
 	// remove duplicated blocks with the same id
 	server.BC.RmDuplicated()
 	server.ProcessingQueue = make(map[string][]*types.Transaction)
-	blockSets := server.BC.GetCurrentBlocks()
 	blocks := make(map[string][]*types.Transaction)
 
-	blockSets.Range(func(key, value any) bool {
-		id := key.(int)
-		blks := value.([]*types.Block)
-		txs := blks[0].Transactions
+	server.PayloadQueue.Range(func(key, value any) bool {
+		id := key.(string)
+		txs := value.(map[string]struct{})
 		delTxs := server.TxPool.DeleteTxs(txs)
-		blocks[strconv.Itoa(id)] = delTxs
+		blocks[id] = delTxs
 		return true
 	})
 
@@ -322,15 +366,17 @@ func (server *Server) processTxPool() int {
 	}
 
 	server.prefetchStates(server.ProcessingQueue)
+	server.PayloadQueue = server.TmpPayloadQueue
+	server.TmpPayloadQueue = new(sync.Map)
 
 	return load
 }
 
 // processTxs executes all transactions in all concurrent blocks
-func (server *Server) processTxs() {
+func (server *Server) processTxs() []byte {
 	// Process all received concurrent blocks in the previous epoch
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	server.MapLock.Lock()
+	server.QueueLock.Lock()
 	server.CompletedQueue = make(map[string][]*types.Transaction)
 	fmt.Printf("load scale is: %d\n", loadScale)
 
@@ -341,19 +387,15 @@ func (server *Server) processTxs() {
 	for id, txs := range server.ProcessingQueue {
 		server.CompletedQueue[id] = txs
 	}
-	server.MapLock.Unlock()
+	server.QueueLock.Unlock()
 
-	server.setState(stateRoot)
+	return stateRoot
 }
 
 // prefetchStates fetches the states of accounts into the statedb
 func (server *Server) prefetchStates(txs map[string][]*types.Transaction) {
 	for _, set := range txs {
 		for _, t := range set {
-			r := rand.New(rand.NewSource(time.Now().UnixNano()))
-			z := zipf.NewZipf(r, 1.0, 100000)
-			payload := core.CreateMimicWorkload(0, z)
-			t.Payload = payload
 			for addr := range t.Payload.RWSets {
 				server.StateDB.PreFetch(addr)
 			}
@@ -431,8 +473,7 @@ func (server *Server) SendTxsForLoop(cycles, largeLoads int) {
 		for _, t := range txs {
 			// serialize tx data and broadcast to the network
 			t.Payload = nil
-			txData := tx{server.NodeID, *t}
-			payload, _ := json.Marshal(txData)
+			payload, _ := json.Marshal(*t)
 			request := append(commandToBytes("tx"), payload...)
 			err2 := server.Network.SyncMsg(request)
 			if err2 != nil {
@@ -444,24 +485,6 @@ func (server *Server) SendTxsForLoop(cycles, largeLoads int) {
 		}
 
 		fmt.Println("Batch of TXs sent success... round ", i+1)
-
-		//go func() {
-		//	for _, t := range tmpTxs {
-		//		payloadInfo := types.PayloadInfo{
-		//			TxID: string(t.ID),
-		//			Data: t.Payload,
-		//		}
-		//		data, _ := json.Marshal(payloadInfo)
-		//		request := append(commandToBytes("payload"), data...)
-		//		err2 := server.Network.SyncMsg(request)
-		//		if err2 != nil {
-		//			log.Panic(err2)
-		//		}
-		//		for k := 0; k < int(interval); k++ {
-		//			time.Sleep(time.Millisecond)
-		//		}
-		//	}
-		//}()
 	}
 }
 
@@ -470,13 +493,13 @@ func (server *Server) ObserveSystemTPS(cycles int) {
 	for i := 0; i < cycles; i++ {
 		time.Sleep(10 * time.Second)
 		txs := make(map[string][]*types.Transaction)
-		server.MapLock.RLock()
+		server.QueueLock.RLock()
 		if len(server.CompletedQueue) > 0 {
 			for id, txSet := range server.CompletedQueue {
 				txs[id] = txSet
 			}
 		}
-		server.MapLock.RUnlock()
+		server.QueueLock.RUnlock()
 
 		height := server.BC.GetLatestHeight()
 		getAppendLatency(txs, height)
