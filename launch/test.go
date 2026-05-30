@@ -8,7 +8,6 @@ import (
 	"MorphDAG/nezha"
 	"flag"
 	"fmt"
-	"github.com/chinuy/zipf"
 	"math/rand"
 	"runtime"
 	"sort"
@@ -16,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/chinuy/zipf"
 )
 
 const dbFile1 = "../data/Morph_Test"
@@ -194,15 +195,23 @@ func main() {
 
 	var sum1 int64
 	var sum2 int64
-	var sum3 int64
+	// var sum3 int64
 
 	statedb1, _ := state.NewState(dbFile1, nil)
 	statedb1.BatchCreateObjects(txs)
+
 	for i := 0; i < 5; i++ {
 		d := runTestMorphDAG(txs, float32(topk), statedb1)
 		sum1 += d
 	}
 	fmt.Printf("Average time of MorphDAG: %.2f\n", float64(sum1)/5)
+
+	sum1 = 0
+	for i := 0; i < 5; i++ {
+		d := runTestPMorphDAG(txs, float32(topk), statedb1)
+		sum1 += d
+	}
+	fmt.Printf("Average time of OPT-MorphDAG: %.2f\n", float64(sum1)/5)
 
 	statedb2, _ := state.NewState(dbFile2, nil)
 	statedb2.BatchCreateObjects(txs)
@@ -212,13 +221,25 @@ func main() {
 	}
 	fmt.Printf("Average time of Serial: %.2f\n", float64(sum2)/5)
 
-	statedb3, _ := state.NewState(dbFile3, nil)
-	statedb3.BatchCreateObjects(txs)
-	for i := 0; i < 5; i++ {
-		d := runTestNezha(txs, blkNum, statedb3)
-		sum3 += d
+	// statedb3, _ := state.NewState(dbFile3, nil)
+	// statedb3.BatchCreateObjects(txs)
+	// for i := 0; i < 5; i++ {
+	// 	d := runTestNezha(txs, blkNum, statedb3)
+	// 	sum3 += d
+	// }
+	// fmt.Printf("Average time of Nezha: %.2f\n", float64(sum3)/5)
+}
+
+// PMorphDAG is to test the new function and old function
+func runTestPMorphDAG(txs map[string][]*types.Transaction, ratio float32, state *state.StateDB) int64 {
+	executor := core.NewExecutor(state, 50000)
+	var totalOrder []string
+	for blkId := range txs {
+		totalOrder = append(totalOrder, blkId)
 	}
-	fmt.Printf("Average time of Nezha: %.2f\n", float64(sum3)/5)
+	sort.Strings(totalOrder)
+	duration := executor.NewProcessingTest(txs, totalOrder, ratio)
+	return duration
 }
 
 func runTestMorphDAG(txs map[string][]*types.Transaction, ratio float32, state *state.StateDB) int64 {
