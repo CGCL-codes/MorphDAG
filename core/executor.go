@@ -92,9 +92,27 @@ func (e *Executor) SerialProcessingTest(txs map[string][]*types.Transaction) int
 	return int64(duration)
 }
 
+func (e *Executor) NewProcessingTest(txs map[string][]*types.Transaction, deps []string, ratio float32) int64 {
+	// update hotspot accounts
+	start := time.Now()
+	e.NewUpdateHotAccounts(txs, ratio, config.HotMode, config.ColdMode)
+	// execute txs and commit state updates
+	graph, hNum, cNum := tp.CreateGraph(deps, txs, e.hotAccounts)
+	e.dispatcher.Run(graph, e.state, deps, hNum, cNum)
+	e.state.Commit()
+	duration := time.Since(start)
+	fmt.Printf("Time of processing transactions is: %s\n", duration)
+	// clear in-memory data (default interval: one epoch)
+	e.state.Reset()
+	return int64(duration)
+}
+
 func (e *Executor) UpdateHotAccounts(txs map[string][]*types.Transaction, ratio float32, hotMode, coldMode bool) {
 	hotAccounts := AnalyzeHotAccounts(txs, ratio, hotMode, coldMode)
 	e.hotAccounts = hotAccounts
 }
-
+func (e *Executor) NewUpdateHotAccounts(txs map[string][]*types.Transaction, ratio float32, hotMode, coldMode bool) {
+	hotAccounts := NewAnalyzeHotAccounts(txs, ratio, hotMode, coldMode)
+	e.hotAccounts = hotAccounts
+}
 func (e *Executor) GetHotAccounts() map[string]struct{} { return e.hotAccounts }
